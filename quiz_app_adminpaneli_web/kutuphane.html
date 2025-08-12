@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sınav Kütüphanesi</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <style>
+    body { background-color: #f8f9fa; }
+    .container { margin-top: 80px; }
+    .card {
+      margin-bottom: 15px;
+      box-shadow: 0 2px 8px rgb(0 0 0 / 0.1);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2 class="mb-4">Sınav Kütüphanesi</h2>
+    <div id="examsList">
+      <!-- Sınavlar burada listelenecek -->
+    </div>
+  </div>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+
+  <script>
+    // Firebase config (kendi projenin config'i ile değiştir)
+    const firebaseConfig = {
+      apiKey: "AIzaSyAH8vC-9v47sd6FZQ5Cp27gKx_w7UgeKBs",
+      authDomain: "quizzapp-6471d.firebaseapp.com",
+      projectId: "quizzapp-6471d",
+      storageBucket: "quizzapp-6471d.appspot.com",
+      messagingSenderId: "435930974786",
+      appId: "1:435930974786:web:11a6b4f2b074f1b397bbdb"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    auth.onAuthStateChanged(user => {
+      if (!user) {
+        alert("Lütfen önce giriş yapınız!");
+        window.location.href = "index.html";
+        return;
+      }
+      loadExams(user.uid);
+    });
+
+    function loadExams(uid) {
+      const examsDiv = document.getElementById("examsList");
+      examsDiv.innerHTML = "<p>Sınavlar yükleniyor...</p>";
+
+      db.collection("exams")
+        .where("uid", "==", uid)
+        .orderBy("createdAt", "desc")
+        .get()
+        .then(snapshot => {
+          examsDiv.innerHTML = ""; // Temizle
+          if (snapshot.empty) {
+            examsDiv.innerHTML = "<p>Henüz sınav bulunmamaktadır.</p>";
+            return;
+          }
+
+          snapshot.forEach(doc => {
+            const exam = doc.data();
+            const examId = doc.id;
+
+            // Kart yapısı
+            const card = document.createElement("div");
+            card.className = "card p-3";
+
+            card.innerHTML = `
+              <h5>${escapeHtml(exam.name)}</h5>
+              <p><strong>Kategori:</strong> ${escapeHtml(exam.category)}</p>
+              <p><strong>Süre:</strong> ${exam.duration} dakika</p>
+              <a href="soru_ekle.html?examId=${examId}" class="btn btn-primary btn-sm me-2">Soru Ekle</a>
+              <a href="soru_listele.html?examId=${examId}" class="btn btn-secondary btn-sm">Soruları Göster</a>
+            `;
+
+            examsDiv.appendChild(card);
+          });
+        })
+        .catch(err => {
+          console.error("Sınavlar yüklenirken hata:", err);
+          examsDiv.innerHTML = "<p>Sınavlar yüklenirken hata oluştu.</p>";
+        });
+    }
+
+    // Basit HTML escape fonksiyonu (XSS önleme için)
+    function escapeHtml(text) {
+      if (!text) return "";
+      return text.replace(/&/g, "&amp;")
+                 .replace(/</g, "&lt;")
+                 .replace(/>/g, "&gt;")
+                 .replace(/"/g, "&quot;")
+                 .replace(/'/g, "&#039;");
+    }
+  </script>
+</body>
+</html>

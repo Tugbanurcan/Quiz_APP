@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Soru Listesi</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+  body { background: #f0f2f5; padding: 20px; }
+  .card { margin-bottom: 15px; border-radius: 12px; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1 class="mb-4">Soru Listesi</h1>
+  <div id="questionsList">
+    <p>Sorular yükleniyor...</p>
+  </div>
+  <button class="btn btn-success mt-3" id="btnAddNew">Yeni Soru Ekle</button>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+
+<script>
+  // Firebase ayarları
+  const firebaseConfig = {
+    apiKey: "AIzaSyAH8vC-9v47sd6FZQ5Cp27gKx_w7UgeKBs",
+    authDomain: "quizzapp-6471d.firebaseapp.com",
+    projectId: "quizzapp-6471d",
+    storageBucket: "quizzapp-6471d.appspot.com",
+    messagingSenderId: "435930974786",
+    appId: "1:435930974786:web:11a6b4f2b074f1b397bbdb"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+
+  // URL'den examId al
+  const urlParams = new URLSearchParams(window.location.search);
+  const examId = urlParams.get("examId");
+
+  if (!examId) {
+    alert("Sınav ID'si bulunamadı!");
+    // İstersen burada yönlendirme yapabilirsin
+  }
+
+  // HTML escape fonksiyonu (basit)
+  function escapeHtml(text) {
+    if (!text) return "";
+    return text.replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[c]);
+  }
+
+  // Şıkları gösteren fonksiyon
+  function renderOptions(choices) {
+    if (!choices || choices.length === 0) return "";
+    return "<ul>" + choices.map(c => "<li>" + escapeHtml(c) + "</li>").join("") + "</ul>";
+  }
+
+  // Soruları yükle
+  function loadQuestions() {
+    const questionsDiv = document.getElementById("questionsList");
+    questionsDiv.innerHTML = "<p>Sorular yükleniyor...</p>";
+
+    db.collection("exams").doc(examId).collection("questions")
+      .orderBy("createdAt", "desc")
+      .get()
+      .then(snapshot => {
+        questionsDiv.innerHTML = "";
+        if (snapshot.empty) {
+          questionsDiv.innerHTML = "<p>Bu sınava ait soru bulunmamaktadır.</p>";
+          return;
+        }
+
+        snapshot.forEach(doc => {
+          const question = doc.data();
+          const correctAnswerText = (question.choices && typeof question.correctIndex === "number")
+            ? question.choices[question.correctIndex]
+            : "Bilinmiyor";
+
+          const card = document.createElement("div");
+          card.className = "card p-3 shadow-sm";
+
+          card.innerHTML = `
+            <p><strong>Soru:</strong> ${escapeHtml(question.question)}</p>
+            <p><strong>Şıklar:</strong> ${renderOptions(question.choices)}</p>
+            <p><strong>Doğru Cevap:</strong> ${escapeHtml(correctAnswerText)}</p>
+            <div>
+              <button class="btn btn-primary btn-sm me-2" onclick="editQuestion('${doc.id}')">Düzenle</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteQuestion('${doc.id}')">Sil</button>
+            </div>
+          `;
+
+          questionsDiv.appendChild(card);
+        });
+      })
+      .catch(err => {
+        questionsDiv.innerHTML = "<p>Hata oluştu: " + err.message + "</p>";
+      });
+  }
+
+  // Düzenleme sayfasına git
+  function editQuestion(questionId) {
+    window.location.href = `soru_ekle.html?examId=${examId}&questionId=${questionId}`;
+  }
+
+  // Silme işlemi
+  function deleteQuestion(questionId) {
+    if (!confirm("Bu soruyu silmek istediğinize emin misiniz?")) return;
+    db.collection("exams").doc(examId).collection("questions").doc(questionId)
+      .delete()
+      .then(() => {
+        alert("Soru silindi.");
+        loadQuestions();
+      })
+      .catch(err => {
+        alert("Silme sırasında hata: " + err.message);
+      });
+  }
+
+  document.getElementById("btnAddNew").addEventListener("click", () => {
+    window.location.href = `soru_ekle.html?examId=${examId}`;
+  });
+
+  // Sayfa yüklendiğinde soruları getir
+  loadQuestions();
+
+</script>
+</body>
+</html>
